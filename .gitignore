@@ -1,0 +1,15 @@
+# Environment variables
+.env
+
+# Python caching
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Local vector store data
+*.pkl
+arthrilens/data/uploads/
+
+# IDE settings
+.vscode/
+.idea/

@@ -10,16 +10,17 @@ if hasattr(sys.stdout, "reconfigure"):
 # Ensure the parent directory is in the path so we can import modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from arthrilens.embedder import LocalEmbedder
+from arthrilens.embedder import GeminiEmbedder
 from arthrilens.vector_store import SimpleVectorStore
+from arthrilens.config import EMBEDDING_MODEL
 
 class Retriever:
     """
     Retrieves the most relevant document chunks for a given query.
     """
-    def __init__(self, vector_store_path: str, model_name: str = "all-MiniLM-L6-v2"):
+    def __init__(self, vector_store_path: str, model_name: str = EMBEDDING_MODEL):
         self.vector_store_path = vector_store_path
-        self.embedder = LocalEmbedder(model_name=model_name)
+        self.embedder = GeminiEmbedder(model_name=model_name)
         
         if not os.path.exists(vector_store_path):
             raise FileNotFoundError(
@@ -43,8 +44,9 @@ class Retriever:
         print(f"Embedding query: '{query}'...")
         query_embedding = self.embedder.embed_query(query)
         
+        # 2. Retrieve chunks from vector store
         print(f"Searching vector store for top-{k} relevant chunks...")
-        results = self.vector_store.search(query_embedding, k=k)
+        results = self.vector_store.search(query_embedding, query_text=query, k=k)
         
         return results
 

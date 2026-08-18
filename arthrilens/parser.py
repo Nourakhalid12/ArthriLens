@@ -83,15 +83,44 @@ class DocumentParser:
             
         return documents
 
+    @staticmethod
+    def parse_txt(file_path: str) -> List[Dict[str, Any]]:
+        """
+        Parses a text file.
+        Returns a list containing a single dict with file contents.
+        """
+        documents = []
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"TXT file not found: {file_path}")
+
+        try:
+            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                text = f.read()
+            if text.strip():
+                documents.append({
+                    "text": text.strip(),
+                    "metadata": {
+                        "source": file_path,
+                        "file_name": os.path.basename(file_path),
+                        "file_type": "txt"
+                    }
+                })
+        except Exception as e:
+            print(f"Error parsing TXT file {file_path}: {e}")
+            
+        return documents
+
     def parse_file(self, file_path: str) -> List[Dict[str, Any]]:
         """
-        Parses a file based on its extension. Supported extensions: .pdf, .xlsx, .xls
+        Parses a file based on its extension. Supported extensions: .pdf, .xlsx, .xls, .txt
         """
         ext = os.path.splitext(file_path.lower())[1]
         if ext == ".pdf":
             return self.parse_pdf(file_path)
         elif ext in [".xlsx", ".xls"]:
             return self.parse_excel(file_path)
+        elif ext == ".txt":
+            return self.parse_txt(file_path)
         else:
             print(f"Unsupported file format: {ext} for file {file_path}")
             return []

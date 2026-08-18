@@ -8,15 +8,16 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from arthrilens.parser import DocumentParser
 from arthrilens.splitter import RecursiveCharacterTextSplitter
-from arthrilens.embedder import LocalEmbedder
+from arthrilens.embedder import GeminiEmbedder
 from arthrilens.vector_store import SimpleVectorStore
+from arthrilens.config import EMBEDDING_MODEL
 
 def run_ingestion_pipeline(
     data_dir: str, 
     vector_store_path: str, 
-    chunk_size: int = 500, 
-    chunk_overlap: int = 50,
-    model_name: str = "all-MiniLM-L6-v2"
+    chunk_size: int = 1200, 
+    chunk_overlap: int = 150,
+    model_name: str = EMBEDDING_MODEL
 ):
     print("=" * 60)
     print("Starting ArthriLens RAG Ingestion Pipeline...")
@@ -28,7 +29,7 @@ def run_ingestion_pipeline(
     print("\n[1/5] Initializing RAG Components...")
     parser = DocumentParser()
     splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
-    embedder = LocalEmbedder(model_name=model_name)
+    embedder = GeminiEmbedder(model_name=model_name)
     vector_store = SimpleVectorStore()
     
     # 2. Scan and parse files

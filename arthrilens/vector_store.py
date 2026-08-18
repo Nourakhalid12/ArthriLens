@@ -35,13 +35,55 @@ class SimpleVectorStore:
         else:
             self.embeddings = np.vstack([self.embeddings, embeddings])
 
-    def search(self, query_embedding: np.ndarray, k: int = 5) -> List[Tuple[Dict[str, Any], float]]:
+    def _compute_keyword_scores(self, query_text: str) -> np.ndarray:
+        if not query_text or not self.documents:
+            return np.zeros(len(self.documents))
+            
+        import re
+        def tokenize(text):
+            return re.findall(r'\b\w+\b', text.lower())
+            
+        query_tokens = tokenize(query_text)
+        if not query_tokens:
+            return np.zeros(len(self.documents))
+            
+        # Compute Document Frequencies (DF)
+        dfs = {}
+        doc_tokens_list = []
+        for doc in self.documents:
+            tokens = set(tokenize(doc.get("text", "")))
+            doc_tokens_list.append(tokens)
+            for t in tokens:
+                dfs[t] = dfs.get(t, 0) + 1
+                
+        num_docs = len(self.documents)
+        
+        # Compute TF-IDF scores
+        scores = []
+        for tokens in doc_tokens_list:
+            score = 0.0
+            for token in query_tokens:
+                if token in tokens:
+                    df = dfs.get(token, 1)
+                    idf = np.log(1.0 + num_docs / df)
+                    score += idf
+            scores.append(score)
+            
+        scores = np.array(scores)
+        max_score = np.max(scores)
+        if max_score > 0:
+            scores = scores / max_score
+        return scores
+
+    def search(self, query_embedding: np.ndarray, query_text: str = None, k: int = 5, hybrid_alpha: float = 0.7) -> List[Tuple[Dict[str, Any], float]]:
         """
-        Performs a cosine similarity search for the top-k documents.
+        Performs a hybrid search combining Cosine Similarity with a lightweight TF-IDF keyword overlap score.
         
         Args:
             query_embedding: Numpy array of shape (embedding_dim,).
+            query_text: The raw query text for keyword matching.
             k: Number of top documents to retrieve.
+            hybrid_alpha: Weight of vector similarity (1 - hybrid_alpha weight of keyword matching).
             
         Returns:
             List of tuples (doc, similarity_score) sorted in descending order of similarity.
@@ -61,6 +103,11 @@ class SimpleVectorStore:
         
         # Calculate cosine similarity (add epsilon to prevent division by zero)
         similarities = dot_products / (doc_norms * query_norm + 1e-9)
+        
+        # Hybrid Search: Combine vector similarity with keyword matching
+        if query_text is not None:
+            keyword_scores = self._compute_keyword_scores(query_text)
+            similarities = hybrid_alpha * similarities + (1 - hybrid_alpha) * keyword_scores
         
         # Get the top-k indices
         top_k_indices = np.argsort(similarities)[::-1][:k]

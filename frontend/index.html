@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ArthriLens - RAG Evaluation Dashboard</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="index.css">
+</head>
+<body>
+    <div class="stars"></div>
+    <div class="glowing-orb orb-1"></div>
+    <div class="glowing-orb orb-2"></div>
+
+    <div class="dashboard-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="logo-container">
+                <span class="logo-icon">✨</span>
+                <h1>ArthriLens <span class="accent-text">RAG Portal</span></h1>
+            </div>
+            <p class="subtitle">Multi-LLM Fallback Generation & Triad Evaluation Dashboard</p>
+        </header>
+
+        <!-- Main Workspace -->
+        <main class="dashboard-main">
+            <!-- Left Side: Query and Logs -->
+            <section class="panel-left">
+                <!-- Search Panel -->
+                <div class="glass-card query-card">
+                    <h2>Ask Clinical Question</h2>
+                    <div class="input-wrapper">
+                        <textarea id="query-input" placeholder="Type a joint health question or clinical guideline query... (e.g., What DMARD therapy is recommended for early RA?)"></textarea>
+                        <div class="controls-row">
+                            <div class="slider-control">
+                                <label for="k-slider">Context Chunks (k): <span id="k-value">4</span></label>
+                                <input type="range" id="k-slider" min="1" max="10" value="4">
+                            </div>
+                            <button id="search-btn" class="glow-button">
+                                <span>Search & Generate</span>
+                                <div class="btn-glow"></div>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Fallback Logs -->
+                <div class="glass-card log-card">
+                    <div class="card-header">
+                        <h2>API Fallback Console</h2>
+                        <span class="pulse-indicator"></span>
+                    </div>
+                    <div class="console-box" id="console-logs">
+                        <span class="log-line text-muted">// System ready. Waiting for query execution...</span>
+                    </div>
+                </div>
+
+                <!-- Knowledge Base Expansion -->
+                <div class="glass-card upload-card">
+                    <h2>Knowledge Base Expansion</h2>
+                    <div class="upload-area">
+                        <label class="file-drop-label" for="file-upload">
+                            <span class="upload-icon">📂</span>
+                            <span class="upload-title">Choose Clinical Document</span>
+                            <span class="upload-subtitle">Supports PDF, Excel, TXT</span>
+                            <span id="selected-file-name" class="file-name-display text-muted">No file selected</span>
+                        </label>
+                        <input type="file" id="file-upload" accept=".pdf,.xlsx,.xls,.txt" style="display: none;">
+                        <button id="upload-btn" class="glow-button btn-secondary">
+                            <span>Index Document</span>
+                            <div class="btn-glow"></div>
+                        </button>
+                    </div>
+                    <div class="upload-status" id="upload-status-box">
+                        <div class="status-indicator-row">
+                            <span class="status-dot status-idle"></span>
+                            <span id="upload-status-text" class="status-text">Ready to upload</span>
+                        </div>
+                        <div class="upload-progress-container" style="display: none;">
+                            <div class="progress-bar-container">
+                                <div id="upload-progress" class="progress-bar" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right Side: Metrics & Results -->
+            <section class="panel-right">
+                <!-- Metrics Panel -->
+                <div class="metrics-grid">
+                    <!-- Provider Info -->
+                    <div class="glass-card metric-card animate-hover">
+                        <span class="metric-label">Active Provider</span>
+                        <div class="metric-value-container">
+                            <span id="metric-provider" class="metric-value">--</span>
+                        </div>
+                        <span id="metric-model" class="metric-subtext">No active request</span>
+                    </div>
+                    <!-- Latency -->
+                    <div class="glass-card metric-card animate-hover">
+                        <span class="metric-label">LLM Latency</span>
+                        <div class="metric-value-container">
+                            <span id="metric-latency" class="metric-value">0.00</span><span class="unit">s</span>
+                        </div>
+                        <span class="metric-subtext">Total round-trip time</span>
+                    </div>
+                    <!-- Avg Similarity -->
+                    <div class="glass-card metric-card animate-hover">
+                        <span class="metric-label">Retrieval Similarity</span>
+                        <div class="metric-value-container">
+                            <span id="metric-similarity" class="metric-value">--</span>
+                        </div>
+                        <div class="progress-bar-container">
+                            <div id="similarity-progress" class="progress-bar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- RAG Triad Evaluator -->
+                <div class="glass-card evaluation-card">
+                    <h2>RAG Triad Evaluation Scores</h2>
+                    <div class="eval-grid">
+                        <!-- Context Relevance -->
+                        <div class="eval-item">
+                            <div class="eval-header">
+                                <h3>Context Relevance</h3>
+                                <span id="score-context" class="eval-score">--%</span>
+                            </div>
+                            <div class="progress-bar-container">
+                                <div id="progress-context" class="progress-bar color-blue" style="width: 0%"></div>
+                            </div>
+                            <p id="desc-context" class="eval-desc">Evaluates if the retrieved chunks directly target the user question.</p>
+                        </div>
+
+                        <!-- Faithfulness / Groundedness -->
+                        <div class="eval-item">
+                            <div class="eval-header">
+                                <h3>Groundedness / Faithfulness</h3>
+                                <span id="score-faith" class="eval-score">--%</span>
+                            </div>
+                            <div class="progress-bar-container">
+                                <div id="progress-faith" class="progress-bar color-green" style="width: 0%"></div>
+                            </div>
+                            <p id="desc-faith" class="eval-desc">Measures if the generated answer contains any claims unsupported by context.</p>
+                        </div>
+
+                        <!-- Answer Relevance -->
+                        <div class="eval-item">
+                            <div class="eval-header">
+                                <h3>Answer Relevance</h3>
+                                <span id="score-answer" class="eval-score">--%</span>
+                            </div>
+                            <div class="progress-bar-container">
+                                <div id="progress-answer" class="progress-bar color-purple" style="width: 0%"></div>
+                            </div>
+                            <p id="desc-answer" class="eval-desc">Assesses how directly and completely the generated answer resolves the query.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Generated Response -->
+                <div class="glass-card response-card">
+                    <h2>Generated Answer</h2>
+                    <div id="response-box" class="response-content">
+                        <span class="text-muted">Submit a query to generate a retrieved-anchored response.</span>
+                    </div>
+                </div>
+
+                <!-- Reference Chunks -->
+                <div class="glass-card references-card">
+                    <h2>Retrieved Context Reference Chunks</h2>
+                    <div class="references-list" id="references-container">
+                        <span class="text-muted">No documents retrieved.</span>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="index.js"></script>
+</body>
+</html>
