@@ -22,7 +22,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
 # Pre-download and cache the sentence-transformers model to speed up container startup on GCP
-RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-small-en-v1.5')"
+RUN python -c "from transformers import AutoTokenizer, AutoModel; AutoTokenizer.from_pretrained('BAAI/bge-small-en-v1.5'); AutoModel.from_pretrained('BAAI/bge-small-en-v1.5')"
 
 # Copy the rest of the application files
 COPY . .
