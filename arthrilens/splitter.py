@@ -5,7 +5,7 @@ class RecursiveCharacterTextSplitter:
     Splits text into chunks recursively using a list of separators.
     Attempts to split on paragraph (\n\n), sentence (\n), word (space), and finally character-by-character.
     """
-    def __init__(self, chunk_size: int = 500, chunk_overlap: int = 50, separators: List[str] = None):
+    def __init__(self, chunk_size: int = 1200 , chunk_overlap: int = 150 , separators: List[str] = None):
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
         self.separators = separators or ["\n\n", "\n", " ", ""]

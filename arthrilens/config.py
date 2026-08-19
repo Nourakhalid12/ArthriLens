@@ -17,7 +17,7 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 
 # Default Models
 EMBEDDING_MODEL = "gemini-embedding-2"
-GEMINI_MODEL = "gemini-3.5-flash"
+GEMINI_MODEL = "gemini-3.5-flash-lite"
 GROQ_MODEL = "groq/compound"
 OPENROUTER_MODEL = "openrouter/free"
 

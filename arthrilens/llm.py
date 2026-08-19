@@ -229,3 +229,73 @@ Response schema:
         except Exception as e:
             print(f"[WARN] Failed to parse evaluator response: {e}. Output was:\n{text}")
             return default_eval
+
+    def rewrite_and_classify_query(self, query: str) -> Dict[str, Any]:
+        """
+        Classifies if the query is related to arthritis, joint health, and guidelines,
+        translates non-English queries to English, and rewrites them to target clinical facts.
+        
+        Returns:
+            Dict: {
+                "is_related": bool,
+                "rewritten_query": str,
+                "refusal_response": str,
+                "model": str,
+                "provider": str,
+                "latency": float,
+                "logs": list
+            }
+        """
+        prompt = f"""You are an intelligent clinical medical search assistant for the ArthriLens RAG portal.
+Your task is to classify, translate, and rewrite the user's input query.
+
+Analyze the query and determine:
+1. Is it related to the domain of arthritis, rheumatology, joint health, or clinical medical guidelines? Set "is_related" to true or false.
+2. If the query is related: translate it to English (if written in Arabic or another language) and rewrite it into clean, search-optimized clinical keywords for retrieving relevant documentation. (e.g. "ياعني اي ريماتويد" -> "Rheumatoid arthritis definition and symptoms").
+3. If the query is unrelated (e.g. "What is the capital of France?", "عاصمة فرنسا", general chit-chat): set "is_related" to false, and write a polite refusal response in "refusal_response". Write the refusal in the SAME language the user asked the question in (e.g. Arabic refusal for Arabic questions, English refusal for English questions). If it is related, "refusal_response" should be empty.
+
+You must respond in strict JSON format matching the schema below. Do not output any explanations, markdown boxes, or other text outside the JSON.
+Response schema:
+{{
+  "is_related": <bool>,
+  "rewritten_query": "<str>",
+  "refusal_response": "<str>"
+}}
+
+User Input Query: {query}
+"""
+        system_instruction = "You are a precise query preprocessor. Output ONLY valid JSON matching the requested schema."
+        
+        eval_res = self.generate(prompt, system_instruction=system_instruction)
+        text = eval_res.get("text", "").strip()
+        
+        # Clean markdown code block wraps if LLM outputted them
+        if text.startswith("```json"):
+            text = text[7:]
+        if text.startswith("```"):
+            text = text[3:]
+        if text.endswith("```"):
+            text = text[:-3]
+        text = text.strip()
+        
+        default_res = {
+            "is_related": True,
+            "rewritten_query": query,
+            "refusal_response": "",
+            "model": eval_res.get("model", "None"),
+            "provider": eval_res.get("provider", "None"),
+            "latency": eval_res.get("latency", 0.0),
+            "logs": eval_res.get("logs", [])
+        }
+        
+        try:
+            res_dict = json.loads(text)
+            default_res.update({
+                "is_related": bool(res_dict.get("is_related", True)),
+                "rewritten_query": res_dict.get("rewritten_query", query) if res_dict.get("is_related", True) else "",
+                "refusal_response": res_dict.get("refusal_response", "")
+            })
+            return default_res
+        except Exception as e:
+            print(f"[WARN] Failed to parse query classifier response: {e}. Output was:\n{text}")
+            return default_res

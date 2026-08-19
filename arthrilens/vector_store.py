@@ -94,6 +94,14 @@ class SimpleVectorStore:
         # Ensure query embedding is 1D
         query_embedding = query_embedding.flatten()
         
+        # Validate shapes match to prevent unaligned shapes crash
+        if self.embeddings.shape[1] != query_embedding.shape[0]:
+            raise ValueError(
+                f"Embedding dimension mismatch during retrieval. "
+                f"Database has {self.embeddings.shape[1]} dimensions, but query has {query_embedding.shape[0]} dimensions. "
+                f"Please ensure the embedder configuration matches the vector database."
+            )
+            
         # Calculate dot products
         dot_products = np.dot(self.embeddings, query_embedding)
         
@@ -109,12 +117,22 @@ class SimpleVectorStore:
             keyword_scores = self._compute_keyword_scores(query_text)
             similarities = hybrid_alpha * similarities + (1 - hybrid_alpha) * keyword_scores
         
-        # Get the top-k indices
-        top_k_indices = np.argsort(similarities)[::-1][:k]
+        # Get the top-k indices based on raw similarity scores
+        top_k_indices = np.argsort(similarities)[::-1]
         
         results = []
         for idx in top_k_indices:
-            results.append((self.documents[idx], float(similarities[idx])))
+            raw_score = float(similarities[idx])
+            # Apply linear calibration mapping to stretch dynamic range:
+            # Map raw score [0.45, 0.85] -> [0.0, 1.0]
+            calibrated_score = (raw_score - 0.45) / 0.40
+            calibrated_score = max(0.0, min(1.0, calibrated_score))
+            
+            # Filter out chunks that are completely unrelated (calibrated score is 0.0)
+            if calibrated_score > 0.0:
+                results.append((self.documents[idx], calibrated_score))
+                if len(results) >= k:
+                    break
             
         return results
 

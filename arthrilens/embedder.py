@@ -166,7 +166,13 @@ class GeminiEmbedder(BaseEmbedder):
                             remaining_texts = texts[idx:]
                             remaining_embeddings = self.local_fallback.embed_documents(remaining_texts)
                             if len(all_embeddings) > 0:
-                                return np.vstack([np.array(all_embeddings), remaining_embeddings])
+                                first_emb = np.array(all_embeddings)
+                                if first_emb.shape[1] != remaining_embeddings.shape[1]:
+                                    raise RuntimeError(
+                                        f"Gemini API rate limit hit and fallback to LocalEmbedder failed due to dimension mismatch. "
+                                        f"Expected {first_emb.shape[1]} dimensions from Gemini, but LocalEmbedder returned {remaining_embeddings.shape[1]} dimensions."
+                                    )
+                                return np.vstack([first_emb, remaining_embeddings])
                             else:
                                 return remaining_embeddings
                                 
@@ -177,6 +183,9 @@ class GeminiEmbedder(BaseEmbedder):
                     else:
                         raise ValueError(f"Gemini API returned error {response.status_code}: {response.text}")
                 except Exception as e:
+                    # Reraise RuntimeErrors from inner blocks
+                    if isinstance(e, RuntimeError) and "dimension mismatch" in str(e):
+                        raise e
                     print(f"[WARN] Exception during API call: {e}. Retrying...")
                     time.sleep(backoff)
                     backoff = min(backoff * 2, 10)
@@ -188,7 +197,13 @@ class GeminiEmbedder(BaseEmbedder):
                 remaining_texts = texts[idx:]
                 remaining_embeddings = self.local_fallback.embed_documents(remaining_texts)
                 if len(all_embeddings) > 0:
-                    return np.vstack([np.array(all_embeddings), remaining_embeddings])
+                    first_emb = np.array(all_embeddings)
+                    if first_emb.shape[1] != remaining_embeddings.shape[1]:
+                        raise RuntimeError(
+                            f"Gemini API rate limit hit and fallback to LocalEmbedder failed due to dimension mismatch. "
+                            f"Expected {first_emb.shape[1]} dimensions from Gemini, but LocalEmbedder returned {remaining_embeddings.shape[1]} dimensions."
+                        )
+                    return np.vstack([first_emb, remaining_embeddings])
                 else:
                     return remaining_embeddings
                     

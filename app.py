@@ -87,10 +87,38 @@ class RAGRequestHandler(BaseHTTPRequestHandler):
                     self._send_response(response_bytes, "application/json", 400)
                     return
                 
-                # 1. Retrieval
+                # 1. Query Rewrite and Intent Check
+                start_rewrite = time.time()
+                intent_res = llm_manager.rewrite_and_classify_query(query)
+                rewrite_latency = time.time() - start_rewrite
+                
+                if not intent_res.get("is_related", True):
+                    response_bytes = json.dumps({
+                        "answer": intent_res.get("refusal_response", "This query is unrelated to arthritis guidelines."),
+                        "references": [],
+                        "model": intent_res.get("model", "None"),
+                        "provider": intent_res.get("provider", "None"),
+                        "llm_latency": round(intent_res.get("latency", 0.0), 4),
+                        "rag_latency": round(rewrite_latency, 4),
+                        "latency": round(rewrite_latency + intent_res.get("latency", 0.0), 4),
+                        "logs": intent_res.get("logs", []),
+                        "evaluation": {
+                            "context_relevance": {"score": 0, "explanation": "Query classified as off-domain"},
+                            "faithfulness": {"score": 0, "explanation": "Query classified as off-domain"},
+                            "answer_relevance": {"score": 0, "explanation": "Query classified as off-domain"}
+                        },
+                        "avg_similarity": 0.0
+                    }).encode("utf-8")
+                    self._send_response(response_bytes, "application/json", 200)
+                    return
+                
+                search_query = intent_res.get("rewritten_query", query)
+                
+                # 2. Retrieval
+                start_rag = time.time()
                 try:
                     retriever = get_retriever()
-                    results = retriever.retrieve(query, k=k)
+                    results = retriever.retrieve(search_query, k=k)
                 except FileNotFoundError as e:
                     response_bytes = json.dumps({
                         "error": "Vector store database is not built yet! Please run the ingestion pipeline first."
@@ -98,14 +126,18 @@ class RAGRequestHandler(BaseHTTPRequestHandler):
                     self._send_response(response_bytes, "application/json", 503)
                     return
                 
+                rag_latency = time.time() - start_rag
+                
                 if not results:
                     response_bytes = json.dumps({
                         "answer": "No relevant documents found in the database. Please try another query.",
                         "references": [],
                         "model": "None",
                         "provider": "None",
-                        "latency": 0.0,
-                        "logs": [],
+                        "llm_latency": 0.0,
+                        "rag_latency": round(rewrite_latency + rag_latency, 4),
+                        "latency": round(rewrite_latency + rag_latency, 4),
+                        "logs": intent_res.get("logs", []),
                         "evaluation": {
                             "context_relevance": {"score": 0, "explanation": "No documents retrieved"},
                             "faithfulness": {"score": 0, "explanation": "No documents retrieved"},
@@ -154,13 +186,21 @@ User Question: {query}
                 # 3. Evaluation
                 eval_res = llm_manager.evaluate_rag(query, context_chunks, answer)
                 
+                llm_latency = generation_res.get("latency", 0.0)
+                total_latency = round(rewrite_latency + rag_latency + llm_latency, 4)
+                
+                # Combine pre-retrieval intent log with generation logs
+                combined_logs = intent_res.get("logs", []) + generation_res.get("logs", [])
+                
                 response_data = {
                     "answer": answer,
                     "references": references,
                     "model": generation_res.get("model", "None"),
                     "provider": generation_res.get("provider", "None"),
-                    "latency": generation_res.get("latency", 0.0),
-                    "logs": generation_res.get("logs", []),
+                    "llm_latency": round(llm_latency, 4),
+                    "rag_latency": round(rewrite_latency + rag_latency, 4),
+                    "latency": total_latency,
+                    "logs": combined_logs,
                     "evaluation": eval_res,
                     "avg_similarity": round(avg_similarity, 4)
                 }
